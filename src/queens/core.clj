@@ -1,50 +1,99 @@
 (ns queens.core)
 
-(deftype QPosition [^int x ^int y])
-
-(defrecord Leaf [value children])
-
-(comment
-
-  Queens Board 
-
-  | [[:p :e :p :e]
-  |  [:p :p :e :e]
- y|  [:Q :p :p :p]
-  |  [:p :p :e :e]] 
-  |_______________ 
-        x
-  )
-(defn positions-board
-  "Create a board of n x n of [x y] coordinates."
+(defn- board
+  "Think of this as the percolate problem.
+  create an area with the area index representing the
+  position on the board, and the value as that tiles value."
   [n]
-  (let [row (vec (range 0 n))]
-    (map (fn [i j]
-           (vec (map (fn [k] [i k]) j)))
-         row
-         (map (fn [i] row) row))))
+  (vec (range 0 (inc (Math/pow n 2)))))
+
+(defn- path-offset
+  [f v]
+  (partial f v))
+
+(defn position
+  [pred coll]
+  (keep-indexed (fn [idx x]
+                  (when (pred x)
+                    idx))
+                coll))
+
+ (defn- diagonal-
+  "Split path at queen. 
+  Iterate over left split -1, right split +1"
+  [n q path]
+  (let [[lower upper] (split-at
+                       (first (position (partial = q) path))
+                              path)
+        lower-diagonal (map-indexed
+                        (fn [idx v]
+                          (let [abs-value (+ v (inc idx))]
+                            (if (>= abs-value 0)
+                              abs-value)))
+                        lower)
+        upper-diagonal (map-indexed
+                        (fn [idx v]
+                          (let [abs-value (- v (inc idx))]
+                            (if (<= abs-value (Math/pow n 2))
+                              abs-value)))
+                        (rest upper))]
+    (filter (fn [i]
+              (not (nil? i)))
+            (concat lower-diagonal (list q) upper-diagonal))))
+
+(defn- diagonal+
+  "Split path at queen. 
+  Iterate over left split -1, right split +1"
+  [n q path]
+  (let [[lower upper] (split-at
+                       (first (position (partial = q) path))
+                              path)
+        lower-diagonal (map-indexed
+                        (fn [idx v]
+                          (let [abs-value (- v (inc idx))]
+                            (if (>= abs-value 0)
+                              abs-value)))
+                        lower)
+        upper-diagonal (map-indexed
+                        (fn [idx v]
+                          (let [abs-value (+ v (inc idx))]
+                            (if (<= abs-value (Math/pow n 2))
+                              abs-value)))
+                        (rest upper))]
+    (filter (fn [i]
+              (not (nil? i)))
+            (concat lower-diagonal (list q) upper-diagonal))))
+
+(defn- horizontal
+  [n q]
+  (let [rows (filter (fn [i]
+                       (= (mod i n) 0))
+                     (board n))]
+    (keep-indexed (fn [idx v]
+                    (if (> n (inc idx))
+                      (let [row (map inc
+                                     (range
+                                      (nth rows idx)
+                                      (nth rows (inc idx))))]
+                        (if (some (partial = q) row)
+                          row))))
+                  rows)))
+
+(defn- vertical
+  [n q]
+  (filter (fn [i]
+            (and (> i 0)
+                 (<= i (Math/pow n 2))))
+          (map (fn [i]
+                 (+ i (mod q n)))
+               (filter
+                (fn [i]
+                  (if-not (= (type i)
+                             clojure.lang.Keyword)
+                    (= (mod i n) 0)
+                    false))
+                (board n)))))
 
 (defn queens-board
-  "Create a new n x n board.
-   Queens Board is a 2d vector of symbols
-      where: 
-          :e = an empty position
-          :p = position in the path of a queen
-          :Q = Queen
-  Board positions are zero based."
-  [n [x y]]
-  (let [row (vec (map (fn [_] :e)
-                      (range 0 n)))
-        posi-board (map (fn [i j]
-                          (vec (map (fn [k] [i k]) j)))
-                        row
-                        (map (fn [i] row) row)) 
-        q-board (map (fn [i]
-                     (if (= y i)
-                       (assoc row x :Q)
-                       row))
-                   (range 0 n))]
-    (filter (fn [p]
-              ())
-            posi-board)
-    q-board)) 
+  [n q]
+  (let [set-queen (assoc (board n) n :q)]))
