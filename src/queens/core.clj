@@ -1,15 +1,26 @@
 (ns queens.core)
 
 (defn- board
-  "Think of this as the percolate problem.
-  create an area with the area index representing the
-  position on the board, and the value as that tiles value."
   [n]
   (vec (range 0 (inc (Math/pow n 2)))))
 
-(defn- path-offset
-  [f v]
-  (partial f v))
+(defn- rows
+  "Bounds defines the ends of the row.
+  Ex. for a 4 x 4 board the bounds will be '(0 4 8 12 16)
+  Leaving the value of each row a range from indexN to indexN + 1"
+  [n]
+  (let [bounds (filter (fn [i]
+                       (= (mod i n) 0))
+                       (board n))]
+    (keep-indexed
+     (fn [idx v]
+       (if (> (inc n) (inc idx))
+         (let [row (map inc
+                        (range
+                         (nth bounds idx)
+                         (nth bounds (inc idx))))]
+           row)))
+     bounds)))
 
 (defn position
   [pred coll]
@@ -18,66 +29,54 @@
                     idx))
                 coll))
 
- (defn- diagonal-
-  "Split path at queen. 
-  Iterate over left split -1, right split +1"
-  [n q path]
-  (let [[lower upper] (split-at
-                       (first (position (partial = q) path))
-                              path)
-        lower-diagonal (map-indexed
-                        (fn [idx v]
-                          (let [abs-value (+ v (inc idx))]
-                            (if (>= abs-value 0)
-                              abs-value)))
-                        lower)
-        upper-diagonal (map-indexed
-                        (fn [idx v]
-                          (let [abs-value (- v (inc idx))]
-                            (if (<= abs-value (Math/pow n 2))
-                              abs-value)))
-                        (rest upper))]
-    (filter (fn [i]
-              (not (nil? i)))
-            (concat lower-diagonal (list q) upper-diagonal))))
+(defn- diagonal-n
+  [section rows]
+  (map-indexed
+   (fn [idx v]
+     (let [row (nth rows idx)
+           offset-values (list
+                          (+ v (inc idx))
+                          (- v (inc idx)))]
+       (filter (fn [i]
+                 (some (partial = i) row))
+               offset-values)))
+   section))
 
-(defn- diagonal+
-  "Split path at queen. 
-  Iterate over left split -1, right split +1"
-  [n q path]
-  (let [[lower upper] (split-at
-                       (first (position (partial = q) path))
-                              path)
-        lower-diagonal (map-indexed
-                        (fn [idx v]
-                          (let [abs-value (- v (inc idx))]
-                            (if (>= abs-value 0)
-                              abs-value)))
-                        lower)
-        upper-diagonal (map-indexed
-                        (fn [idx v]
-                          (let [abs-value (+ v (inc idx))]
-                            (if (<= abs-value (Math/pow n 2))
-                              abs-value)))
-                        (rest upper))]
-    (filter (fn [i]
-              (not (nil? i)))
-            (concat lower-diagonal (list q) upper-diagonal))))
+(defn- diagonal
+  [n q]
+  (let [rows (rows n)
+        base (vertical n q)
+        [lower upper] (split-at
+                      (first (position (partial = q) base))
+                      base)
+        [lower-rows upper-rows] (split-at
+                                 (first (keep-indexed
+                                   (fn [idx i]
+                                     (when (some
+                                            (partial = q) i)
+                                       idx))
+                                   rows))
+                                 rows)]
+    (flatten
+     (concat (diagonal-n lower lower-rows)
+             (list q)
+             (diagonal-n (rest upper) (rest upper-rows))))))
+
 
 (defn- horizontal
   [n q]
   (let [rows (filter (fn [i]
                        (= (mod i n) 0))
                      (board n))]
-    (keep-indexed (fn [idx v]
-                    (if (> n (inc idx))
-                      (let [row (map inc
-                                     (range
-                                      (nth rows idx)
-                                      (nth rows (inc idx))))]
-                        (if (some (partial = q) row)
-                          row))))
-                  rows)))
+    (first (keep-indexed (fn [idx v]
+                           (if (> (inc n) (inc idx))
+                             (let [row (map inc
+                                            (range
+                                             (nth rows idx)
+                                             (nth rows (inc idx))))]
+                               (if (some (partial = q) row)
+                                 row))))
+                         rows))))
 
 (defn- vertical
   [n q]
@@ -94,6 +93,18 @@
                     false))
                 (board n)))))
 
+(defn queens-path
+  [n q]
+  (set
+   (concat (vertical n q)
+           (horizontal n q)
+           (diagonal n q))))
+
 (defn queens-board
   [n q]
-  (let [set-queen (assoc (board n) n :q)]))
+  (let [queens-verticals (vertical 4 6)
+        intersects (set (flatten (horizontal 4 6)
+                                (diagonal+ 4 6 queens-verticals)
+                                (diagonal- 4 6 queens-verticals)
+                                queens-verticals))]
+    intersects))
