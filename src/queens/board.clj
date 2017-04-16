@@ -1,5 +1,26 @@
 (ns queens.board)
 
+(definterface IQueensBoard
+  (getN [])
+  (getQueen [])
+  (getLocked []))
+
+(defrecord QueensBoard
+    [^int n
+     ^int queen
+     ^ints locked]
+  IQueensBoard
+  (getN [this] n)
+  (getQueen [this] queen)
+  (getLocked [this] locked))
+
+(defn construct-board
+  "Create a new Queensboard object."
+  ([n q l]
+   (map->QueensBoard {:n n
+                      :queen q
+                      :locked l})))
+
 (defn blank-board
   "Create an n x n board, represented as a single array."
   [n]
@@ -34,5 +55,4 @@
   "Check all paths for possible intersects."
   [q board]
   (some (partial = q) board))
-
 
