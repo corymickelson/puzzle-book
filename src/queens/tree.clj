@@ -33,50 +33,6 @@
   (getRoot [this] root)
   (complete [this n] nil))
 
-(defn construct-tree
-  "Initialize tree
-   Can be initialized with the size of the board (n) 
-   and the first position.
-
-   Or... If a section of the board is already filled
-   pass an additional vector of positions
-
-   All possible positions available for the next unfulfilled 
-   row will be declared as children to the last position 
-   in the vector."
-  ([n queen]
-   (let [candidates-list (candidates n queen)
-         tree-root (->Leaf (->QueensBoard n queen (queen/queens-path n queen))
-                           [])
-         child-nodes (map
-                      (fn [i]
-                        (let [board (->QueensBoard n i (queen/queens-path n i))]
-                          (->Leaf board [])))
-                      (second candidates-list))]
-     (map (fn [item]
-            (let [children (vec
-                            (flatten
-                             (conj
-                              (list item)
-                              (list (:children tree-root)))))]
-              (assoc tree-root :children children)))
-          child-nodes)))
-  
-  ([n queen queens]
-   (let [candidate-leafs (map (fn [item]
-                                (->Leaf (->QueensBoard n item (queen/queens-path n item)) []))
-                              (first (rest (candidates n queen queens))))
-         root-node (->Leaf (->QueensBoard n (first queens) (queen/queens-path n (first queens))) [])
-         init-tree (reduce (fn [tree node]
-                             (let [leaf-node (->Leaf (->QueensBoard n node (queen/queens-path n node)) [])
-                                   child-nodes (if (= (last queens) node)
-                                                          (assoc leaf-node :children (vec candidate-leafs))
-                                                          leaf-node)]
-                                  (assoc tree :children child-nodes)))
-                              root-node
-                              (rest queens))]
-     init-tree)))
-
 (defn- straight-line-sink
   "Follow the first child down till depth of n."
   ([^ITree tree depth]
@@ -130,12 +86,14 @@
      (candidate-list queen next-row next-row-q)))
   ([n queen queens]
    (let [depth (count queens)
+         active-queen (queen/queens-path n queen)
          intersects (reduce
                      union
                      #{}
                      (map (fn [i]
                             (queens-path n i))
-                          (conj queens queen)))
+                          (conj queens queen)
+                          ))
          next-row   (nth (rows n) (inc depth))
          next-row-q (queens-on-row next-row intersects)]
      (candidate-list queen next-row next-row-q))))
@@ -151,3 +109,48 @@
     (if-not (empty? search)
      search)))
 
+(defn- construct-leaf
+  [n queen children]
+  (->Leaf
+   (->QueensBoard n queen (queen/queens-path n queen)) children))
+
+(defn construct-tree
+  "Initialize tree
+   Can be initialized with the size of the board (n) 
+   and the first position.
+
+   Or... If a section of the board is already filled
+   pass an additional vector of positions
+
+   All possible positions available for the next unfulfilled 
+   row will be declared as children to the last position 
+   in the vector."
+  ([n queen]
+   (let [candidates-list (candidates n queen)
+         tree-root (construct-leaf n queen []) 
+         child-nodes (map
+                      (fn [i]
+                        (construct-leaf n i []))
+                      (second candidates-list))]
+     (map (fn [item]
+            (let [children (flatten
+                             (conj
+                              (list item)
+                              (list (:children tree-root))))]
+              (assoc tree-root :children children)))
+          child-nodes)))
+  
+  ([n queen queens]
+   (let [candidate-leafs (map (fn [item]
+                                (construct-leaf n item []))
+                              (flatten (candidates n queen queens)))
+         working-node (assoc (first candidate-leafs) :children (rest candidate-leafs)) 
+         init-tree (reduce (fn [tree node]
+                             (let [leaf-node (->Leaf (->QueensBoard n node (queen/queens-path n node)) [])
+                                   child-nodes (if (= (last queens) node)
+                                                          (assoc leaf-node :children  (list working-node))
+                                                          (list leaf-node))]
+                                  (assoc tree :children (list child-nodes))))
+                              (construct-leaf n (first queens) [])
+                              (rest queens))]
+     init-tree)))
